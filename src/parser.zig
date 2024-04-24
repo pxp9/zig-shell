@@ -1,9 +1,9 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
-const splitSequence = std.mem.splitSequence;
-const trim = std.mem.trim;
 const Allocator = std.mem.Allocator;
 const copyForwards = std.mem.copyForwards;
+const splitSequence = std.mem.splitSequence;
+const trim = std.mem.trim;
 
 pub const ShellError = error{
     ParseError,
@@ -29,22 +29,36 @@ pub const Commands = struct {
 };
 
 pub const Command = struct {
-    program: []const u8,
     args: Args,
 
     pub fn print(self: Command, stdout_writer: anytype) !void {
-        try stdout_writer.print("Program: {s} ", .{self.program});
-        try stdout_writer.print("Args: {s}\n", .{self.args.args.items});
+        try stdout_writer.print("Program: {s} ", .{self.args.args.items[0]});
+        try stdout_writer.print("Args: {s}\n", .{self.args.args.items[1 .. self.args.argc - 1]});
     }
 
     pub fn destroy(self: Command) void {
-        self.args.args.allocator.free(self.program);
         self.args.destroy();
+    }
+
+    // wtf is this ?
+    // the main reason of this is C
+    // C needs null terminated array of strings
+    // and each string is a null terminated array of chars
+
+    pub fn toArgv(self: Command, alloc: Allocator) ![*:null]const ?[*:0]const u8 {
+        const argv: [:null]?[*:0]u8 = try alloc.allocSentinel(?[*:0]u8, self.args.argc, null);
+        for (self.args.args.items, 0..) |arg, i| {
+            const len = self.args.args.items[i].len;
+            const n_arg = try alloc.allocSentinel(u8, len, 0);
+            @memcpy(n_arg[0..arg.len], arg);
+            argv[i] = n_arg;
+        }
+        return argv;
     }
 };
 
 pub const Args = struct {
-    args: ArrayList([]u8),
+    args: ArrayList([]const u8),
     argc: u8,
 
     pub fn destroy(self: Args) void {
@@ -69,12 +83,7 @@ pub const Parser = struct {
         if (val == null) {
             return error.ParseError;
         }
-        var args = ArrayList([]u8).init(self.allocator);
-
-        // Reserve space for the program name
-        const program = try self.allocator.alloc(u8, val.?.len);
-        copyForwards(u8, program, val.?);
-        val = it.next();
+        var args = ArrayList([]const u8).init(self.allocator);
         var argc: u8 = 0;
         while (val) |arg| : ({
             val = it.next();
@@ -82,12 +91,12 @@ pub const Parser = struct {
         }) {
 
             // Reserve space for the argument
-            const ptr = try self.allocator.alloc(u8, arg.len);
-            copyForwards(u8, ptr, arg);
+            const ptr: []const u8 = try self.allocator.alloc(u8, arg.len);
+            copyForwards(u8, @constCast(ptr), arg);
 
             try args.append(ptr);
         }
-        return Command{ .program = program, .args = Args{ .args = args, .argc = argc } };
+        return Command{ .args = Args{ .args = args, .argc = argc } };
     }
 
     fn destroy_commands(commands: ArrayList(Command)) void {
