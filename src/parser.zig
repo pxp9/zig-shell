@@ -113,21 +113,18 @@ pub const Parser = struct {
         var val = it.next();
         var argvc: u8 = 0;
         var commands = ArrayList(Command).init(self.allocator);
+        errdefer destroy_commands(commands);
         while (val) |command| : ({
             val = it.next();
             argvc += 1;
         }) {
             if (command.len == 0) {
-                destroy_commands(commands);
                 return error.ParseError;
             }
             const command_trimmed = trim(u8, command, " \n\t");
             const cmd = self.parse_args(
                 command_trimmed,
             ) catch |err| {
-                if (err == error.ParseError) {
-                    destroy_commands(commands);
-                }
                 return err;
             };
 
