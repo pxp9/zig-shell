@@ -1,6 +1,7 @@
 const std = @import("std");
 const parser_mod = @import("parser.zig");
 const execution_mod = @import("execution.zig");
+const bison_mod = @import("bison_parser.zig");
 const ArrayList = std.ArrayList;
 const GeneralPurposeAllocator = std.heap.GeneralPurposeAllocator;
 const EnvMap = std.process.EnvMap;
@@ -33,7 +34,7 @@ pub fn main() !void {
     var to_parse = try ArrayList(u8).initCapacity(allocator, 256);
     defer to_parse.deinit();
 
-    try stdout_writer.print("Welcome to the Zig Shell.\n", .{});
+    try stdout_writer.print("\nWelcome to the Zig Shell.\n", .{});
 
     const parser = parser_mod.Parser.init(allocator);
     const env_map = try getEnvMap(allocator);
@@ -53,6 +54,8 @@ pub fn main() !void {
                 else => {},
             }
         };
+
+        try bison_mod.parse(stdout_writer);
 
         // parse the commands
         const commands = parser.parse(&to_parse, stdout_writer) catch |err| {

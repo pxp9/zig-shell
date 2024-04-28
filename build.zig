@@ -1,4 +1,5 @@
 const std = @import("std");
+const CFlags = &.{};
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
@@ -9,6 +10,20 @@ pub fn build(b: *std.Build) void {
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
+
+    var bison = b.addSystemCommand(&.{"bison"});
+    bison.addArg("--yacc");
+    bison.addArg("-b");
+    bison.addArg("src/");
+    bison.addArg("-d");
+    bison.addArg("-o");
+    bison.addArg("src/parser/parser.c");
+    bison.addArg("src/parser/parser.y");
+
+    var flex = b.addSystemCommand(&.{"flex"});
+    flex.addArg("-o");
+    flex.addArg("src/parser/scanner.c");
+    flex.addArg("src/parser/scanner.l");
 
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
@@ -22,6 +37,16 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    exe.addCSourceFile(.{
+        .file = b.path("src/parser/parser.c"),
+        .flags = CFlags,
+    });
+    exe.addCSourceFile(.{
+        .file = b.path("src/parser/scanner.c"),
+        .flags = CFlags,
+    });
+
+    exe.linkLibCpp();
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
@@ -49,6 +74,16 @@ pub fn build(b: *std.Build) void {
     // This will evaluate the `run` step rather than the default, which is "install".
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
+    run_step.dependOn(&bison.step);
+    run_step.dependOn(&flex.step);
+
+    var clean_cmd = b.addSystemCommand(&.{"rm"});
+    clean_cmd.addArg("-rf");
+    clean_cmd.addArg("src/parser/parser.c");
+    clean_cmd.addArg("src/parser/parser.h");
+    clean_cmd.addArg("src/parser/scanner.c");
+    const clean = b.step("clean", "Remove build artifacts");
+    clean.dependOn(&clean_cmd.step);
 
     const exe_unit_tests = b.addTest(.{
         .root_source_file = b.path("src/main.zig"),
