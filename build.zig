@@ -37,6 +37,13 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const exe_parser = b.addExecutable(.{
+        .name = "parser",
+        .root_source_file = b.path("src/main_parser.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     exe.addCSourceFile(.{
         .file = b.path("src/parser/parser.c"),
         .flags = CFlags,
@@ -51,11 +58,13 @@ pub fn build(b: *std.Build) void {
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
     b.installArtifact(exe);
-
+    b.installArtifact(exe_parser);
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
     // such a dependency.
     const run_cmd = b.addRunArtifact(exe);
+
+    const run_parser_cmd = b.addRunArtifact(exe_parser);
 
     // By making the run step depend on the install step, it will be run from the
     // installation directory rather than directly from within the cache directory.
@@ -67,6 +76,7 @@ pub fn build(b: *std.Build) void {
     // command itself, like this: `zig build run -- arg1 arg2 etc`
     if (b.args) |args| {
         run_cmd.addArgs(args);
+        run_parser_cmd.addArgs(args);
     }
 
     // This creates a build step. It will be visible in the `zig build --help` menu,
@@ -76,6 +86,9 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
     run_step.dependOn(&bison.step);
     run_step.dependOn(&flex.step);
+
+    const run_parser_step = b.step("run_parser", "Run the parser");
+    run_parser_step.dependOn(&run_parser_cmd.step);
 
     var clean_cmd = b.addSystemCommand(&.{"rm"});
     clean_cmd.addArg("-rf");
