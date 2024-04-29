@@ -1,1 +1,4 @@
 zig-*
+src/parser/parse.c
+src/parser/parse.h
+src/parser/scanner.c
