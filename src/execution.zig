@@ -4,24 +4,32 @@ pub const Command = parser_mod.Command;
 const Allocator = std.mem.Allocator;
 const EnvMap = std.process.EnvMap;
 
+const ArrayList = std.ArrayList;
 pub const fd_t = std.posix.fd_t;
 const dup2 = std.posix.dup2;
 const close = std.posix.close;
 
 fn redirection(descriptor_dup: i32, descriptor_close: i32) !void {
-    try dup2(descriptor_close, descriptor_dup);
+    try dup2(descriptor_dup, descriptor_close);
     close(descriptor_dup);
 }
 
 pub fn handle_first_child(
-    pipe: ?[2]fd_t,
+    pipes: ArrayList([2]fd_t),
     argvc: u8,
 ) !void {
     // first command
     if (argvc > 1) {
-        close(pipe.?[0]);
-        try redirection(pipe.?[1], 1);
+        const pipe = pipes.items[0];
+        close(pipe[0]);
+        try redirection(pipe[1], 1);
     }
+}
+
+pub fn handle_last_child(
+    pipe: [2]fd_t,
+) !void {
+    try redirection(pipe[0], 0);
 }
 
 pub fn createNullDelimitedEnvMap(arena: Allocator, env_map: *const EnvMap) ![:null]?[*:0]u8 {

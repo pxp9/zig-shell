@@ -149,3 +149,19 @@ pub const Parser = struct {
         return commands;
     }
 };
+
+pub fn getLineAndParse(
+    stdin_reader: anytype,
+    stdout_writer: anytype,
+    to_parse: *ArrayList(u8),
+    parser: Parser,
+) !Commands {
+
+    // here is when we block on reading from stdin until we got new commands
+    try stdin_reader.streamUntilDelimiter(to_parse.writer(), '\n', null);
+
+    // parse the commands
+    const commands = try parser.parse(to_parse, stdout_writer);
+
+    return commands;
+}
